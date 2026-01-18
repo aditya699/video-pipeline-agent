@@ -1,0 +1,5 @@
+claude-agent-sdk
+python-dotenv
+azure-storage-blob
+elevenlabs
+anthropic
