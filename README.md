@@ -198,3 +198,8 @@ MIT — Use it, modify it, ship it.
 ---
 
 > **A note:** A lot of service-based jobs — the kind you'd hire someone for on a freelance platform — are going to be done by agents soon. If you're a creator or builder, being AI-first means you'll prefer to build and deploy an agent over hiring for repetitive tasks. This is one of those. The era of "I'll just hire someone for this" is shifting to "I'll just build an agent for this." Learn to build them.
+
+**Pricing**
+
+Claude Haiku: $0.02 dollars per 1-1:30 min reels
+Eleven Labs : 2k Credits (Note-90K tokens are in a 5 dollar pack)
