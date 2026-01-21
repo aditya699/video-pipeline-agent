@@ -31,7 +31,9 @@ def run_video_pipeline(file_path: str, progress_callback=None) -> dict:
     2. Transcribe (Hindi)
     3. Translate to English
     4. Generate editor script
-    5. Save all outputs
+    5. Generate English audio (TTS)
+    6. Generate Instagram & LinkedIn captions
+    7. Save all outputs locally & upload to Azure
 
     Args:
         file_path: Path to video/audio file
@@ -51,7 +53,7 @@ def run_video_pipeline(file_path: str, progress_callback=None) -> dict:
     }
 
     # === STEP 1: Upload to Azure ===
-    report(1, 6, "started", "Uploading to Azure...")
+    report(1, 7, "started", "Uploading to Azure...")
     try:
         connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
         container_name = os.getenv("AZURE_CONTAINER_NAME")
@@ -68,14 +70,14 @@ def run_video_pipeline(file_path: str, progress_callback=None) -> dict:
 
         results["azure_url"] = blob_client.url
         results["steps_completed"].append("upload")
-        report(1, 6, "done")
+        report(1, 7, "done")
 
     except Exception as e:
         logger.error(f"Upload failed: {e}")
         results["upload_error"] = str(e)
 
     # === STEP 2: Transcribe with ElevenLabs ===
-    report(2, 6, "started", "Transcribing audio (Hindi)...")
+    report(2, 7, "started", "Transcribing audio (Hindi)...")
     try:
         api_key = os.getenv("ELEVENLABS_API_KEY")
         if not api_key:
@@ -92,7 +94,7 @@ def run_video_pipeline(file_path: str, progress_callback=None) -> dict:
 
         results["hindi_transcript"] = transcription.text
         results["steps_completed"].append("transcribe")
-        report(2, 6, "done")
+        report(2, 7, "done")
 
     except Exception as e:
         logger.error(f"Transcription failed: {e}")
@@ -100,7 +102,7 @@ def run_video_pipeline(file_path: str, progress_callback=None) -> dict:
         return results  # Can't continue without transcript
 
     # === STEP 3: Translate to English ===
-    report(3, 6, "started", "Translating to English...")
+    report(3, 7, "started", "Translating to English...")
     try:
         response = anthropic_client.messages.create(
             model="claude-haiku-4-5-20251001",
@@ -122,14 +124,14 @@ Now translate:
         )
         results["english_transcript"] = response.content[0].text
         results["steps_completed"].append("translate")
-        report(3, 6, "done")
+        report(3, 7, "done")
 
     except Exception as e:
         logger.error(f"Translation failed: {e}")
         results["translate_error"] = str(e)
 
     # === STEP 4: Generate Editor Script ===
-    report(4, 6, "started", "Generating editor script...")
+    report(4, 7, "started", "Generating editor script...")
     try:
         response = anthropic_client.messages.create(
             model="claude-haiku-4-5-20251001",
@@ -154,14 +156,14 @@ Generate the editor script:"""
         )
         results["editor_script"] = response.content[0].text
         results["steps_completed"].append("editor_script")
-        report(4, 6, "done")
+        report(4, 7, "done")
 
     except Exception as e:
         logger.error(f"Editor script failed: {e}")
         results["editor_error"] = str(e)
 
     # === STEP 5: Generate English Audio (Text-to-Speech) ===
-    report(5, 6, "started", "Generating English audio...")
+    report(5, 7, "started", "Generating English audio...")
     try:
         api_key = os.getenv("ELEVENLABS_API_KEY")
         elevenlabs = ElevenLabs(api_key=api_key)
@@ -178,14 +180,75 @@ Generate the editor script:"""
 
         results["english_audio"] = audio_bytes
         results["steps_completed"].append("text_to_speech")
-        report(5, 6, "done")
+        report(5, 7, "done")
 
     except Exception as e:
         logger.error(f"Text-to-speech failed: {e}")
         results["tts_error"] = str(e)
 
-    # === STEP 6: SAVE ALL FILES & UPLOAD AUDIO ===
-    report(6, 6, "started", "Saving files & uploading audio...")
+    # === STEP 6: Generate Social Media Captions ===
+    report(6, 7, "started", "Generating Instagram & LinkedIn captions...")
+    try:
+        response = anthropic_client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=2048,
+            messages=[{
+                "role": "user",
+                "content": f"""Based on this video transcript, create engaging social media captions.
+
+TRANSCRIPT:
+{results.get("english_transcript", results["hindi_transcript"])}
+
+Generate TWO captions:
+
+## INSTAGRAM CAPTION
+- Hook in first line (attention-grabbing)
+- Use line breaks for readability
+- Include relevant emojis
+- Add a call-to-action
+- Include 5-10 relevant hashtags at the end
+- Keep it under 2200 characters
+
+## LINKEDIN CAPTION
+- Professional tone
+- Start with a hook or insight
+- Use short paragraphs
+- Include a thought-provoking question or CTA
+- No hashtags in the middle, only 3-5 at the very end
+- Keep it under 3000 characters
+
+Format your response exactly as:
+---INSTAGRAM---
+[instagram caption here]
+
+---LINKEDIN---
+[linkedin caption here]"""
+            }]
+        )
+
+        caption_text = response.content[0].text
+
+        # Parse the captions
+        if "---INSTAGRAM---" in caption_text and "---LINKEDIN---" in caption_text:
+            parts = caption_text.split("---LINKEDIN---")
+            instagram_part = parts[0].replace("---INSTAGRAM---", "").strip()
+            linkedin_part = parts[1].strip() if len(parts) > 1 else ""
+
+            results["instagram_caption"] = instagram_part
+            results["linkedin_caption"] = linkedin_part
+        else:
+            # Fallback: store the whole response
+            results["social_captions"] = caption_text
+
+        results["steps_completed"].append("social_captions")
+        report(6, 7, "done")
+
+    except Exception as e:
+        logger.error(f"Social captions failed: {e}")
+        results["social_captions_error"] = str(e)
+
+    # === STEP 7: SAVE ALL FILES & UPLOAD ===
+    report(7, 7, "started", "Saving files & uploading...")
     try:
         output_dir = "output"
         os.makedirs(output_dir, exist_ok=True)
@@ -220,6 +283,20 @@ Generate the editor script:"""
                 f.write(results["english_audio"])
             results["english_audio_file"] = path
 
+        # Save Instagram caption
+        if "instagram_caption" in results:
+            path = os.path.join(output_dir, f"{base_name}_instagram.txt")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(results["instagram_caption"])
+            results["instagram_file"] = path
+
+        # Save LinkedIn caption
+        if "linkedin_caption" in results:
+            path = os.path.join(output_dir, f"{base_name}_linkedin.txt")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(results["linkedin_caption"])
+            results["linkedin_file"] = path
+
         results["steps_completed"].append("save_files")
 
         # Upload all files to Azure (part of step 6)
@@ -251,8 +328,24 @@ Generate the editor script:"""
                 blob_client.upload_blob(data, overwrite=True)
             results["english_audio_url"] = blob_client.url
 
+        # Upload Instagram caption
+        if "instagram_file" in results:
+            blob_name = os.path.basename(results["instagram_file"])
+            blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+            with open(results["instagram_file"], "rb") as data:
+                blob_client.upload_blob(data, overwrite=True)
+            results["instagram_caption_url"] = blob_client.url
+
+        # Upload LinkedIn caption
+        if "linkedin_file" in results:
+            blob_name = os.path.basename(results["linkedin_file"])
+            blob_client = blob_service_client.get_blob_client(container=container_name, blob=blob_name)
+            with open(results["linkedin_file"], "rb") as data:
+                blob_client.upload_blob(data, overwrite=True)
+            results["linkedin_caption_url"] = blob_client.url
+
         results["steps_completed"].append("upload_files")
-        report(6, 6, "done")
+        report(7, 7, "done")
 
     except Exception as e:
         logger.error(f"Save/upload failed: {e}")
