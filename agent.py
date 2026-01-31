@@ -63,6 +63,10 @@ async def video_pipeline_tool(args):
             response += f"\n- Editor script: {result['editor_file']}"
         if "english_audio_file" in result:
             response += f"\n- English audio: {result['english_audio_file']}"
+        if "instagram_file" in result:
+            response += f"\n- Instagram caption: {result['instagram_file']}"
+        if "linkedin_file" in result:
+            response += f"\n- LinkedIn caption: {result['linkedin_file']}"
 
         response += f"\n\n**Cloud URLs (share with editor):**"
         if "azure_url" in result:
@@ -73,6 +77,10 @@ async def video_pipeline_tool(args):
             response += f"\n- Editor Notes: {result['editor_script_url']}"
         if "english_audio_url" in result:
             response += f"\n- English Audio: {result['english_audio_url']}"
+        if "instagram_caption_url" in result:
+            response += f"\n- Instagram Caption: {result['instagram_caption_url']}"
+        if "linkedin_caption_url" in result:
+            response += f"\n- LinkedIn Caption: {result['linkedin_caption_url']}"
 
         response += f"""
 
@@ -82,7 +90,15 @@ async def video_pipeline_tool(args):
 
 ---
 **EDITOR SCRIPT:**
-{result.get('editor_script', 'N/A')}"""
+{result.get('editor_script', 'N/A')}
+
+---
+**INSTAGRAM CAPTION:**
+{result.get('instagram_caption', 'N/A')}
+
+---
+**LINKEDIN CAPTION:**
+{result.get('linkedin_caption', 'N/A')}"""
 
         return {"content": [{"type": "text", "text": response}]}
 
@@ -104,11 +120,21 @@ Your main capability is the video_pipeline tool which:
 2. Transcribes audio (Hindi speech-to-text)
 3. Translates transcript to English
 4. Generates an editor script with B-roll suggestions, cuts, etc.
-5. Saves all outputs to /output folder
+5. Generates English audio (text-to-speech)
+6. Generates Instagram & LinkedIn captions
+7. Saves all outputs to /output folder and uploads to Azure
 
 When the user wants to process a video, use the video_pipeline tool.
-After the pipeline completes, ALWAYS include all cloud URLs in your reply so the user can easily share them with their editor.
-Be concise and helpful."""
+After the pipeline completes, ALWAYS include ALL cloud URLs in your reply including:
+- Video URL
+- Transcript URL
+- Editor Notes URL
+- English Audio URL
+- Instagram Caption URL
+- LinkedIn Caption URL
+
+Also show the Instagram and LinkedIn caption content in your response.
+Be concise but include all URLs and captions."""
 
 # Streaming input (required for MCP)
 async def message_generator(user_input):
